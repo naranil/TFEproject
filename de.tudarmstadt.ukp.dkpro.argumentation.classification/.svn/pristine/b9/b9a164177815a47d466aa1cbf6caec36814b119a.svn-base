@@ -1,0 +1,199 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.features.sentiment;
+
+import static org.apache.uima.fit.factory.AnalysisEngineFactory.createEngineDescription;
+import static org.apache.uima.fit.factory.CollectionReaderFactory.createReaderDescription;
+import static org.apache.uima.fit.util.JCasUtil.select;
+import static org.apache.uima.fit.util.JCasUtil.selectCovered;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.uima.fit.pipeline.JCasIterable;
+import org.apache.uima.jcas.JCas;
+import org.apache.uima.resource.ResourceInitializationException;
+
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
+import de.tudarmstadt.ukp.dkpro.core.io.text.TextReader;
+import de.tudarmstadt.ukp.dkpro.core.languagetool.LanguageToolSegmenter;
+import de.tudarmstadt.ukp.dkpro.core.stanfordsentiment.SentimentAnnotation;
+import de.tudarmstadt.ukp.dkpro.core.stanfordsentiment.StanfordSentimentAnnotator;
+import de.tudarmstadt.ukp.dkpro.tc.api.exception.TextClassificationException;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.DocumentFeatureExtractor;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.Feature;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.FeatureExtractorResource_ImplBase;
+
+/**
+ *
+ * This feature extractor takes for each sentence its main class in term of sentiment (very
+ * negative, negative, neutral, positive, very positive) and counts all the consecutive rules (ex
+ * "++ -> -", "- -> 0", ect...) and give their distribution
+ *
+ * Use {@link #getMaximumIndex(double[] t)} to find the main sentiment of the sentence
+ *
+ * @author Anil Narassiguin
+ * @param jcas
+ *            of a document
+ * @return distribution of the 25 sentiment rules
+ *
+ */
+
+// Check this feature extractor with unit test... Worked only when I remove "default:" in switch, find out why...
+public class SentimentFluctuation
+    extends FeatureExtractorResource_ImplBase
+    implements DocumentFeatureExtractor
+{
+
+    Map<String, Integer> sentimentFluctuation = new HashMap<String, Integer>();
+
+    @Override
+    public List<Feature> extract(JCas jcas)
+        throws TextClassificationException
+    {
+        Map<String, Integer> sentimentFluctuation = sentimentRules();
+        List<Feature> features = new ArrayList<Feature>();
+
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        List<Sentence> sentenceList = new ArrayList(select(jcas, Sentence.class));
+        for (int i = 0; i < sentenceList.size() - 1; i++) {
+            Sentence sentence1 = sentenceList.get(i);
+            Sentence sentence2 = sentenceList.get(i + 1);
+
+            SentimentAnnotation sentiment1 = selectCovered(SentimentAnnotation.class, sentence1)
+                    .get(0);
+            SentimentAnnotation sentiment2 = selectCovered(SentimentAnnotation.class, sentence2)
+                    .get(0);
+
+            double[] sentimentArray1 = { sentiment1.getVeryNegative(), sentiment1.getNegative(),
+                    sentiment1.getNeutral(), sentiment1.getPositive(), sentiment1.getVeryPositive() };
+
+            double[] sentimentArray2 = { sentiment2.getVeryNegative(), sentiment2.getNegative(),
+                    sentiment2.getNeutral(), sentiment2.getPositive(), sentiment2.getVeryPositive() };
+
+            // remove the system.out when I'm sure of this feature extractor
+            System.out.println("Size of 1 : " + sentimentArray1.length);
+            System.out.println("Max of 1 : " + getMaximumIndex(sentimentArray1));
+            System.out.println("Size of 2 : " + sentimentArray1.length);
+            System.out.println("Max of 2 : " + getMaximumIndex(sentimentArray2));
+
+            String rule = correspondingSentiment(getMaximumIndex(sentimentArray1)) + " -> "
+                    + correspondingSentiment(getMaximumIndex(sentimentArray2));
+
+            System.out.println("Corresponding rule : " + rule);
+            System.out.println("Corresponding number : " + sentimentFluctuation.get(rule));
+
+
+            System.out.println("Symbol of 1 : " + correspondingSentiment(getMaximumIndex(sentimentArray1)));
+
+            System.out.println("Symbol of 2 : " + correspondingSentiment(getMaximumIndex(sentimentArray2)));
+
+            sentimentFluctuation.put(rule, sentimentFluctuation.get(rule) + 1);
+
+            System.out.println("");
+
+        }
+
+        for (String rule : sentimentFluctuation.keySet()) {
+            features.add(new Feature("Sentiment Fluctuation " + rule, sentimentFluctuation.get(rule)));
+        }
+
+        return features;
+    }
+
+    public static Map<String, Integer> sentimentRules()
+    {
+        String[] sentiments = { "VeryNegative", "Negative", "Neutral", "Positive", "VeryPositive" };
+        Map<String, Integer> sentimentFluctuation = new HashMap<String, Integer>();
+
+        for (String sentiment1 : sentiments) {
+            for (String sentiment2 : sentiments) {
+                sentimentFluctuation.put(sentiment1 + " -> " + sentiment2, 0);
+            }
+        }
+
+        return sentimentFluctuation;
+
+    }
+
+    public static int getMaximumIndex(double[] t)
+    {
+
+        double max = t[0];
+        int maxIndex = 0;
+
+        for (int i = 0; i < t.length; i++) {
+            if (t[i] > max) {
+                max = t[i];
+                maxIndex = i;
+            }
+        }
+
+        return maxIndex;
+    }
+
+    public static String correspondingSentiment(int maxIndex)
+    {
+        String symbol = "";
+        switch (maxIndex) {
+        case 0:
+            symbol = "VeryNegative";
+            break;
+        case 1:
+            symbol = "Negative";
+            break;
+        case 2:
+            symbol = "Neutral";
+            break;
+        case 3:
+            symbol = "Positive";
+            break;
+        case 4:
+            symbol = "VeryPositive";
+//        default:
+//            throw new IllegalArgumentException(
+//                    "The sentiment coefficients array should be of size 5");
+
+        }
+
+        return symbol;
+    }
+
+    public static void main(String[] args) throws ResourceInitializationException
+    {
+
+//        String[] sentiments = { "--", "-", "0", "+", "++" };
+//        Map<String, Integer> sentimentFluctuation = new HashMap<String, Integer>();
+//
+//        for (String sentiment1 : sentiments) {
+//            for (String sentiment2 : sentiments) {
+//                sentimentFluctuation.put(sentiment1 + " -> " + sentiment2, 0);
+//            }
+//        }
+//
+//        for (String rule : sentimentFluctuation.keySet()){
+//            System.out.println(rule);
+//        }
+
+        JCasIterable pipeline = new JCasIterable(
+                // Read input
+                createReaderDescription(TextReader.class,
+                        TextReader.PARAM_SOURCE_LOCATION, "src/main/resources/test/txt",
+                        TextReader.PARAM_LANGUAGE, "en",
+                        TextReader.PARAM_PATTERNS,TextReader.INCLUDE_PREFIX + "*.txt"),
+                createEngineDescription(LanguageToolSegmenter.class),
+
+                createEngineDescription(StanfordSentimentAnnotator.class));
+
+        for (JCas jcas : pipeline) {
+            for (Sentence sentence : select(jcas, Sentence.class)) {
+                SentimentAnnotation sentiment = selectCovered(SentimentAnnotation.class, sentence)
+                        .get(0);
+                System.out.println(sentiment);
+
+            }
+
+    }
+
+}
+}

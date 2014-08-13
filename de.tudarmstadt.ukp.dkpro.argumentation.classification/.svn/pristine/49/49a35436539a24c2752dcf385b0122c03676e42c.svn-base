@@ -1,0 +1,73 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation;
+
+import de.tudarmstadt.ukp.dkpro.argumentation.classification.writer.AnalysisResultConsoleWriter;
+import de.tudarmstadt.ukp.dkpro.lab.task.Dimension;
+import org.apache.commons.io.IOUtils;
+import org.apache.uima.fit.factory.AnalysisEngineFactory;
+import org.apache.uima.fit.factory.JCasFactory;
+import org.apache.uima.fit.factory.TypeSystemDescriptionFactory;
+import org.apache.uima.fit.pipeline.SimplePipeline;
+import org.apache.uima.jcas.JCas;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Result;
+import org.junit.runner.notification.Failure;
+
+import java.util.List;
+
+public class AbstractEvaluationScenarioTest
+{
+
+    private JCas jCas;
+
+    @Before
+    public void setUp()
+            throws Exception
+    {
+
+        jCas = JCasFactory
+                .createJCas(TypeSystemDescriptionFactory.createTypeSystemDescription());
+        String text = IOUtils.toString(this.getClass().getClassLoader()
+                .getResourceAsStream("gold_data/1289_P1_artcomment_prayer-in-schools.txt"));
+        jCas.setDocumentText(text);
+        jCas.setDocumentLanguage("en");
+
+    }
+
+    @Test
+    public void testGetPreprocessing()
+            throws Exception
+    {
+        SimplePipeline.runPipeline(jCas,
+                new MockAbstractEvaluationScenario().getPreprocessing(),
+//                AnalysisEngineFactory.createEngineDescription(CasDumpWriter.class),
+                AnalysisEngineFactory.createEngineDescription(AnalysisResultConsoleWriter.class)
+        );
+
+    }
+
+    static class MockAbstractEvaluationScenario
+            extends AbstractEvaluationScenario
+    {
+
+        @Override Dimension<List<String>> getFeatureSets()
+        {
+            return null;
+        }
+
+        @Override Dimension<List<Object>> getPipelineParameters()
+        {
+            return null;
+        }
+    }
+
+    public static void main(String[] args)
+    {
+        Result result = JUnitCore.runClasses(AbstractEvaluationScenarioTest.class);
+        for (Failure failure : result.getFailures()) {
+            System.out.println(failure.toString());
+        }
+        System.out.println(result.wasSuccessful());
+    }
+}

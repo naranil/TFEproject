@@ -1,0 +1,120 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.features.pos;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.Fields;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.MultiFields;
+import org.apache.lucene.index.Terms;
+import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.BytesRef;
+import org.apache.uima.fit.descriptor.ConfigurationParameter;
+import org.apache.uima.fit.descriptor.TypeCapability;
+import org.apache.uima.resource.ResourceInitializationException;
+import org.apache.uima.util.Level;
+
+import com.google.common.collect.MinMaxPriorityQueue;
+
+import de.tudarmstadt.ukp.dkpro.core.api.frequency.util.FrequencyDistribution;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.meta.MetaCollector;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.meta.MetaDependent;
+import de.tudarmstadt.ukp.dkpro.tc.features.ngram.base.LuceneFeatureExtractorBase;
+import de.tudarmstadt.ukp.dkpro.tc.features.ngram.meta.LucenePOSNGramMetaCollector;
+import de.tudarmstadt.ukp.dkpro.tc.features.ngram.util.TermFreqTuple;
+
+@TypeCapability(inputs = { "de.tudarmstadt.ukp.dkpro.core.api.lexmorph.type.pos.POS" })
+
+public class POSNGramFeatureExtractorBase
+    extends LuceneFeatureExtractorBase
+    implements MetaDependent
+{
+public static final String LUCENE_POS_NGRAM_FIELD = "posngram";
+
+public static final String PARAM_POS_NGRAM_MIN_N = "posNgramMinN";
+@ConfigurationParameter(name = PARAM_POS_NGRAM_MIN_N, mandatory = true, defaultValue = "1")
+protected int posNgramMinN;
+
+public static final String PARAM_POS_NGRAM_MAX_N = "posNgramMaxN";
+@ConfigurationParameter(name = PARAM_POS_NGRAM_MAX_N, mandatory = true, defaultValue = "3")
+protected int posNgramMaxN;
+
+public static final String PARAM_POS_NGRAM_USE_TOP_K = "posNgramUseTopK";
+@ConfigurationParameter(name = PARAM_POS_NGRAM_USE_TOP_K, mandatory = true, defaultValue = "500")
+protected int posNgramUseTopK;
+
+public static final String PARAM_USE_CANONICAL_POS = "useCanonicalPos";
+@ConfigurationParameter(name = PARAM_USE_CANONICAL_POS, mandatory = true, defaultValue = "true")
+protected boolean useCanonicalTags;
+
+@Override
+public List<Class<? extends MetaCollector>> getMetaCollectorClasses()
+{
+    List<Class<? extends MetaCollector>> metaCollectorClasses = new ArrayList<Class<? extends MetaCollector>>();
+    metaCollectorClasses.add(LucenePOSNGramMetaCollector.class);
+
+    return metaCollectorClasses;
+}
+
+@Override
+protected String getFieldName()
+{
+    return LUCENE_POS_NGRAM_FIELD;
+}
+
+@Override
+protected String getFeaturePrefix()
+{
+    return "posngram";
+}
+
+@Override
+protected int getTopN()
+{
+    return posNgramUseTopK;
+}
+
+@Override
+protected FrequencyDistribution<String> getTopNgrams()
+    throws ResourceInitializationException
+{
+
+    FrequencyDistribution<String> topNGrams = new FrequencyDistribution<String>();
+
+    MinMaxPriorityQueue<TermFreqTuple> topN = MinMaxPriorityQueue.maximumSize(getTopN())
+            .create();
+
+    IndexReader reader;
+    try {
+        reader = DirectoryReader.open(FSDirectory.open(luceneDir));
+        Fields fields = MultiFields.getFields(reader);
+        if (fields != null) {
+            Terms terms = fields.terms(getFieldName());
+            if (terms != null) {
+                TermsEnum termsEnum = terms.iterator(null);
+                BytesRef text = null;
+                while ((text = termsEnum.next()) != null) {
+                    String term = text.utf8ToString();
+                    long freq = termsEnum.totalTermFreq();
+                    topN.add(new TermFreqTuple(term, freq));
+                }
+            }
+        }
+    }
+    catch (Exception e) {
+        throw new ResourceInitializationException(e);
+    }
+
+    int size = topN.size();
+    for (int i = 0; i < size; i++) {
+        TermFreqTuple tuple = topN.poll();
+        topNGrams.addSample(tuple.getTerm(), tuple.getFreq());
+    }
+
+    getLogger().log(Level.INFO, "+++ TAKING " + topNGrams.getB() + " NGRAMS");
+
+    return topNGrams;
+}
+}

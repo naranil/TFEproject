@@ -1,0 +1,67 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.features.lexical;
+
+import static org.apache.uima.fit.util.JCasUtil.select;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.uima.jcas.JCas;
+
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
+import de.tudarmstadt.ukp.dkpro.tc.api.exception.TextClassificationException;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.DocumentFeatureExtractor;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.Feature;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.FeatureExtractorResource_ImplBase;
+
+/**
+*
+* @author Anil Narassiguin Features: post length, number of word per sentence
+*                                    ratio of words with more than 6 letters
+* @return The post length
+* @return Number of word per sentence
+* @return Ratio of words with more than 6 letters
+* From "Stance Classification of Ideological Debates: Data, Models, Features, and Constraints"
+* Kazi Saidul Hasan and Vincent Ng
+* Inspired from Anand et al.'s (2011) features
+*
+*/
+
+public class DocStatFeature
+    extends FeatureExtractorResource_ImplBase
+    implements DocumentFeatureExtractor
+{
+
+    @Override
+    public List<Feature> extract(JCas jcas)
+        throws TextClassificationException
+    {
+        // Post length in letters
+        double postLength = jcas.getDocumentText().length();
+
+        // Number of word per sentences
+        double wordPerSentence = select(jcas, Token.class).size() / select(jcas, Sentence.class).size();
+
+        // Ratio of words with more than 6 letters
+        double nbMoreSixLetters = 0;
+
+        for (Token token : select(jcas, Token.class)){
+            if (token.getCoveredText().length() > 5){
+                nbMoreSixLetters++;
+            }
+        }
+
+        try {
+            nbMoreSixLetters /= select(jcas, Token.class).size();
+        }
+        catch (Exception e){
+
+        }
+        List<Feature> featList = new ArrayList<Feature>();
+        featList.add(new Feature("post_length", postLength));
+        featList.add(new Feature("word_per_sentence", wordPerSentence));
+        featList.add(new Feature("word_more_6_letters", nbMoreSixLetters));
+        return featList;
+    }
+
+}

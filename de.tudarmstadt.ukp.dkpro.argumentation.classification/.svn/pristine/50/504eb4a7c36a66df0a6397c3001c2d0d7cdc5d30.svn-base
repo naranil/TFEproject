@@ -1,0 +1,95 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.indicators;
+
+import static org.apache.uima.fit.util.JCasUtil.select;
+import static org.apache.uima.fit.util.JCasUtil.selectCovered;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.apache.uima.jcas.JCas;
+
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
+import de.tudarmstadt.ukp.dkpro.core.api.semantics.type.SemanticArgument;
+import de.tudarmstadt.ukp.dkpro.core.api.semantics.type.SemanticPredicate;
+import de.tudarmstadt.ukp.dkpro.tc.api.exception.TextClassificationException;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.DocumentFeatureExtractor;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.Feature;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.FeatureExtractorResource_ImplBase;
+
+/**
+ *
+ * @author Anil Narassiguin
+ * @return Feature described in the article "Identifying argumentative discourse structures in Persuasive Essays"
+ * Detects a First person mark in argument components.
+ */
+//TODO refactor: move to features/thirdparty
+public class FirstPersonInArgumentComponent
+    extends FeatureExtractorResource_ImplBase
+    implements DocumentFeatureExtractor
+{
+
+    static final String FIRSTPERSONINARGUMENT = "first_person_in_argument";
+
+
+    @Override
+    public List<Feature> extract(JCas jcas)
+        throws TextClassificationException
+    {
+        double nbArgument = 0;
+        double nbI = 0;
+        double nbMe = 0;
+        double nbMy = 0;
+        double nbMine = 0;
+        double nbMyself = 0;
+        double nbFirstPerson = 0;
+        for (Sentence sentence : select(jcas, Sentence.class)) {
+            for (SemanticPredicate pred : selectCovered(SemanticPredicate.class, sentence)) {
+
+                for (SemanticArgument arg : select(pred.getArguments(), SemanticArgument.class)) {
+//                    System.out.printf("\t%s:%s", arg.getRole(), arg.getCoveredText());
+                    nbArgument++;
+
+                    switch(arg.getCoveredText().toUpperCase()){
+                    case "I":
+                        nbI++;
+                        nbFirstPerson++;
+                        break;
+                    case "ME":
+                        nbMe++;
+                        nbFirstPerson++;
+                        break;
+                    case "MY":
+                        nbMy++;
+                        nbFirstPerson++;
+                        break;
+                    case "MINE":
+                        nbMine++;
+                        nbFirstPerson++;
+                        break;
+                    case "MYSELF":
+                        nbMyself++;
+                        nbFirstPerson++;
+                        break;
+                    default:
+                        System.out.println("No first person");
+
+
+                    }
+
+
+                }
+            }
+        }
+
+        List<Feature> featList = new ArrayList<Feature>();
+        featList.addAll(Arrays.asList(new Feature(FIRSTPERSONINARGUMENT + "_I", nbI)));
+        featList.addAll(Arrays.asList(new Feature(FIRSTPERSONINARGUMENT + "_me", nbMe)));
+        featList.addAll(Arrays.asList(new Feature(FIRSTPERSONINARGUMENT + "_my", nbMy)));
+        featList.addAll(Arrays.asList(new Feature(FIRSTPERSONINARGUMENT + "_myself", nbMyself)));
+        featList.addAll(Arrays.asList(new Feature(FIRSTPERSONINARGUMENT + "_mine", nbMine)));
+        featList.addAll(Arrays.asList(new Feature(FIRSTPERSONINARGUMENT + "_total", nbFirstPerson)));
+        return featList;
+
+    }
+}

@@ -1,0 +1,57 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
+
+public class ExperimentRunnerXmi
+{
+    static Logger logger = Logger.getLogger(ExperimentRunnerXmi.class.getName());
+
+    public static void main(String[] args) throws IOException
+    {
+        // different settings
+        List<AbstractEvaluationScenarioXmi> evaluationScenarios = new ArrayList<>();
+
+        // baseline
+        evaluationScenarios.add(new BaselineXmi());
+        // extended baseline (?)
+//        evaluationScenarios.add(new ExtendedBaseline());
+
+
+        for (AbstractEvaluationScenarioXmi evaluationScenario : evaluationScenarios) {
+            logger.info("Evaluation scenario: " + evaluationScenario);
+
+//            // first: full cross validation
+//            evaluationScenario.runFullCrossValidation();
+//
+//            // in-domain for all domains
+//            for (DocumentDomain documentDomain : DocumentDomain.values()) {
+//                evaluationScenario.runInDomainCrossValidation(documentDomain);
+//            }
+//
+//             //cross-domain for all domains
+//            for (DocumentDomain documentDomain : DocumentDomain.values()) {
+//                evaluationScenario.runCrossDomain(documentDomain);
+//            }
+
+            evaluationScenario.runInDomainCrossValidation(DocumentDomain.MAINSTREAMING);
+//            evaluationScenario.runCrossDomain(DocumentDomain.MAINSTREAMING);
+
+
+
+            Runtime rt = Runtime.getRuntime();
+            rt.exec("python python/end.py");
+        }
+
+    }
+
+    public static void main1test(String[] args)
+    {
+//        new BaselineNGram().runInDomainCrossValidation(DocumentDomain.PUBLIC_PRIVATE_SCHOOLS);
+        new BaselineNGram().runCrossDomain(DocumentDomain.PUBLIC_PRIVATE_SCHOOLS);
+    }
+
+}
+

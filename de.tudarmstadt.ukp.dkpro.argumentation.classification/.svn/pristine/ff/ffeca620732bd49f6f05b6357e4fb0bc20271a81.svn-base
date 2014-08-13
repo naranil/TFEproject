@@ -1,0 +1,170 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.features.lexical;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.uima.fit.util.JCasUtil;
+import org.apache.uima.jcas.JCas;
+
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
+import de.tudarmstadt.ukp.dkpro.tc.api.exception.TextClassificationException;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.DocumentFeatureExtractor;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.Feature;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.FeatureExtractorResource_ImplBase;
+
+/**
+*
+* @author Anil Narassiguin Features: interrogation, exclamation, colon, comma, quotation ratio and number
+* of multiple punctuation
+* From ?
+*
+*/
+
+public class PunctuationFeature
+    extends FeatureExtractorResource_ImplBase
+    implements DocumentFeatureExtractor
+{
+
+
+    @Override
+    public List<Feature> extract(JCas jcas)
+        throws TextClassificationException
+    {
+        // Interrogation mark
+        double nbToken = JCasUtil.select(jcas, Token.class).size();
+        double nbSentences = JCasUtil.select(jcas, Sentence.class).size();
+        double nbInterrogation = 0;
+        double ratioInterrogation = 0;
+
+        for (Token token : JCasUtil.select(jcas, Token.class)) {
+            if (token.getCoveredText().equals("?")) {
+                nbInterrogation += 1;
+            }
+
+        }
+
+        try {
+            ratioInterrogation = nbInterrogation / nbToken;
+        }
+        catch (Exception e) {
+            ratioInterrogation = 0;
+        }
+
+        // Exclamation mark
+        double nbExclamation = 0;
+        double ratioExclamation = 0;
+
+        for (Token token : JCasUtil.select(jcas, Token.class)) {
+            if (token.getCoveredText().equals("!")) {
+                nbExclamation += 1;
+            }
+
+        }
+
+        try {
+            ratioExclamation = nbExclamation / nbToken;
+        }
+        catch (Exception e) {
+            ratioExclamation = 0;
+        }
+
+        // Point mark
+        double nbPoint = 0;
+        double ratioPoint = 0;
+
+        for (Token token : JCasUtil.select(jcas, Token.class)) {
+            if (token.getCoveredText().equals(".")) {
+                nbPoint += 1;
+            }
+
+        }
+
+        try {
+            ratioPoint = nbPoint / nbToken;
+        }
+        catch (Exception e) {
+            ratioPoint = 0;
+        }
+
+        // Comma
+        double nbComma = 0;
+        double ratioComma = 0;
+
+        for (Token token : JCasUtil.select(jcas, Token.class)) {
+            if (token.getCoveredText().equals(",")) {
+                nbComma += 1;
+            }
+
+        }
+
+        try {
+            ratioComma = nbComma / nbToken;
+        }
+        catch (Exception e) {
+            ratioComma = 0;
+        }
+
+        // Colon
+        double nbColon = 0;
+        double ratioColon = 0;
+
+        for (Token token : JCasUtil.select(jcas, Token.class)) {
+            if (token.getCoveredText().equals(":")) {
+                nbColon += 1;
+            }
+
+        }
+
+        try {
+            ratioColon = nbColon / nbToken;
+        }
+        catch (Exception e) {
+            ratioColon = 0;
+        }
+
+        // Quotation
+        double nbQuotation = 0;
+        double ratioQuotation = 0;
+
+        for (Token token : JCasUtil.select(jcas, Token.class)) {
+            if (token.getCoveredText().equals("\"")) {
+                nbQuotation += 1;
+            }
+
+        }
+
+        try {
+            ratioQuotation = nbQuotation / nbToken;
+        }
+        catch (Exception e) {
+            ratioQuotation = 0;
+        }
+
+
+        // Occurence of Multiple Punctuation (example "???", ";?!!", ect...)
+        String pattern = "[?!.,]+";
+        Pattern r = Pattern.compile(pattern);
+        Matcher m = r.matcher(jcas.getDocumentText());
+
+        int countMultiplePunc = 0;
+        while (m.find()){
+            if (m.group(0).length() > 1){
+                countMultiplePunc++;
+            }
+        }
+
+        List<Feature> featList = new ArrayList<Feature>();
+        featList.add(new Feature("interrogation_ration", ratioInterrogation));
+        featList.add(new Feature("exclamation_ratio", ratioExclamation));
+        featList.add(new Feature("point_ratio", ratioPoint));
+        featList.add(new Feature("comma_ratio", ratioComma));
+        featList.add(new Feature("colon_ratio", ratioColon));
+        featList.add(new Feature("quotation_ratio", ratioQuotation));
+        featList.add(new Feature("multiple_punctuation", countMultiplePunc));
+        return featList;
+    }
+
+}

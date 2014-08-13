@@ -1,0 +1,82 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.ngram.lemma;
+
+import static org.apache.uima.fit.util.JCasUtil.select;
+import static org.apache.uima.fit.util.JCasUtil.toText;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.uima.jcas.JCas;
+
+import de.tudarmstadt.ukp.dkpro.core.api.frequency.util.FrequencyDistribution;
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Lemma;
+import de.tudarmstadt.ukp.dkpro.core.ngrams.util.NGramStringListIterable;
+import de.tudarmstadt.ukp.dkpro.tc.api.exception.TextClassificationException;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.DocumentFeatureExtractor;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.Feature;
+
+public class LuceneNGramLemmaDFE
+    extends LuceneNGramLemmaBase
+    implements DocumentFeatureExtractor
+{
+    public static final String LUCENE_NGRAM_FIELD = "ngramLemma";
+    public static final String NGRAM_GLUE = "_";
+
+    @Override
+    public List<Feature> extract(JCas jcas)
+        throws TextClassificationException
+    {
+        List<Feature> features = new ArrayList<Feature>();
+        FrequencyDistribution<String> documentNgrams = null;
+
+        documentNgrams = getDocumentNgramsLemma(jcas,
+                filterPartialStopwordMatches, ngramMinN, ngramMaxN, stopwords);
+
+        for (String topNgram : topKSet.getKeys()) {
+            if (documentNgrams.getKeys().contains(topNgram)) {
+                features.add(new Feature(getFeaturePrefix() + "_" + topNgram, 1));
+            }
+            else {
+                features.add(new Feature(getFeaturePrefix() + "_" + topNgram, 0));
+            }
+        }
+        return features;
+    }
+
+    public static FrequencyDistribution<String> getDocumentNgramsLemma(JCas jcas,
+            boolean filterPartialMatches, int minN, int maxN, Set<String> stopwords)
+    {
+        FrequencyDistribution<String> documentNgrams = new FrequencyDistribution<String>();
+//        for (Sentence s : select(jcas, Sentence.class)) {
+            for (List<String> ngram : new NGramStringListIterable(toText(select(jcas, Lemma.class
+                    )), minN, maxN)) {
+
+                if (passesNgramFilter(ngram, stopwords, filterPartialMatches)) {
+                    String ngramString = StringUtils.join(ngram, NGRAM_GLUE);
+                    documentNgrams.inc(ngramString);
+                }
+            }
+//        }
+        return documentNgrams;
+    }
+
+    public static boolean passesNgramFilter(List<String> tokenList, Set<String> stopwords,
+            boolean filterPartialMatches)
+    {
+        List<String> filteredList = new ArrayList<String>();
+        for (String ngram : tokenList) {
+            if (!stopwords.contains(ngram)) {
+                filteredList.add(ngram);
+            }
+        }
+
+        if (filterPartialMatches) {
+            return filteredList.size() == tokenList.size();
+        }
+        else {
+            return filteredList.size() != 0;
+        }
+    }
+}

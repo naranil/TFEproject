@@ -1,0 +1,62 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.features.lexical;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.apache.uima.fit.util.JCasUtil;
+import org.apache.uima.jcas.JCas;
+
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
+import de.tudarmstadt.ukp.dkpro.tc.api.exception.TextClassificationException;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.DocumentFeatureExtractor;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.Feature;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.FeatureExtractorResource_ImplBase;
+
+public class SimpleSentenceExtractor
+    extends FeatureExtractorResource_ImplBase
+    implements DocumentFeatureExtractor
+{
+    static final String SENTENCE = "sentence";
+
+    @Override
+    public List<Feature> extract(JCas jcas)
+        throws TextClassificationException
+    {
+
+        double nbSentence = 0;
+        double minSentence = -1; // Sizes in word
+        double maxSentence = 0;
+        double meanSentence = 0;
+        for (Sentence sentence : JCasUtil.select(jcas, Sentence.class)) {
+            nbSentence++;
+            if (minSentence < 0) {
+                minSentence = sentence.getCoveredText().split("").length; // gets the size value of
+                                                                          // the first token
+            }
+
+            if (minSentence > sentence.getCoveredText().split("").length) {
+                minSentence = sentence.getCoveredText().split("").length;
+            }
+
+            if (maxSentence < sentence.getCoveredText().split("").length) {
+                maxSentence = sentence.getCoveredText().split("").length;
+            }
+
+            meanSentence += sentence.getCoveredText().split("").length;
+        }
+        try {
+            meanSentence /= nbSentence;
+        }
+        catch (Exception e) {
+            meanSentence = 0;
+        }
+
+        List<Feature> featList = new ArrayList<Feature>();
+        featList.addAll(Arrays.asList(new Feature("nb_" + SENTENCE, nbSentence)));
+        featList.addAll(Arrays.asList(new Feature("max_" + SENTENCE + "_size", maxSentence)));
+        featList.addAll(Arrays.asList(new Feature("min_" + SENTENCE + "_size", minSentence)));
+        featList.addAll(Arrays.asList(new Feature("mean_" + SENTENCE + "_size", meanSentence)));
+        return featList;
+    }
+}

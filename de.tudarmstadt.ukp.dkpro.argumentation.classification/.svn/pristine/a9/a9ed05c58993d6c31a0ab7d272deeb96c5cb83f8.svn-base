@@ -1,0 +1,42 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation;
+
+import java.util.Arrays;
+import java.util.List;
+
+import de.tudarmstadt.ukp.dkpro.lab.task.Dimension;
+
+/**
+ *
+ * @author Anil Narassiguin
+ * Experiment with no feature, fo the ZeroR classification
+ *
+ */
+public class NoFeature
+extends AbstractEvaluationScenario
+{
+
+@SuppressWarnings("unchecked")
+@Override
+Dimension<List<Object>> getPipelineParameters()
+{
+
+    return Dimension.create(
+            DIM_PIPELINE_PARAMS,
+            Arrays.asList(new Object[] {
+
+            }));
+}
+
+@SuppressWarnings("unchecked")
+@Override
+Dimension<List<String>> getFeatureSets()
+{
+    return Dimension.create(
+            DIM_FEATURE_SET,
+            Arrays.asList(new String[] {
+
+                    }));
+
+}
+
+}

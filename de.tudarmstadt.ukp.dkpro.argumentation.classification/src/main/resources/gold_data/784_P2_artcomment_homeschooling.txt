@@ -1,0 +1,6 @@
+With regard to the "you can't say something is wrong any more" thing, that might actually be useful in a perverse way. 
+Assume a child has written this:
+Which is the more useful response from the teacher
+"wrong 0/5 must do better"
+or
+"Quadratics don't work that way, the answer should be c = (a^2 + b^2)^0.5 because what you really have is aa + bb = cc not 2a + 2b = 2c" 

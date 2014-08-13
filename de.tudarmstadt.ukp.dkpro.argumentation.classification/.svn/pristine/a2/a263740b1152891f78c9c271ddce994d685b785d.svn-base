@@ -1,0 +1,68 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.features.lexical;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.apache.uima.fit.util.JCasUtil;
+import org.apache.uima.jcas.JCas;
+
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
+import de.tudarmstadt.ukp.dkpro.tc.api.exception.TextClassificationException;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.DocumentFeatureExtractor;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.Feature;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.FeatureExtractorResource_ImplBase;
+/**
+ * (c) 2014 Anil Narassiguin
+ */
+
+/**
+ * Total number of exclamation mark and ratio (ratio per token and per sentences)
+ *
+ * @author anil
+ * @param jcas
+ */
+public class ExclamativeRatio
+    extends FeatureExtractorResource_ImplBase
+    implements DocumentFeatureExtractor
+{
+    static final String EXCLAMATIVE = "exclamative";
+
+    @Override
+    public List<Feature> extract(JCas jcas)
+        throws TextClassificationException
+    {
+        double nbToken = JCasUtil.select(jcas, Token.class).size();
+        double nbSentences = JCasUtil.select(jcas, Sentence.class).size();
+        double nbExclamative = 0;
+        double ratioExclamative = 0;
+        double ratioExclamativeSentence = 0;
+        for (Token token : JCasUtil.select(jcas, Token.class)) {
+            if (token.getCoveredText() == "!") {
+                nbExclamative += 1;
+            }
+
+        }
+
+        try {
+            ratioExclamative = nbExclamative / nbToken;
+        }
+        catch (Exception e) {
+            ratioExclamative = 0;
+        }
+
+        try {
+            ratioExclamativeSentence = nbExclamative / nbSentences;
+        }
+        catch (Exception e) {
+            ratioExclamativeSentence = 0;
+        }
+
+        List<Feature> featList = new ArrayList<Feature>();
+        featList.addAll(Arrays.asList(new Feature(EXCLAMATIVE + "_total", nbExclamative)));
+        featList.addAll(Arrays.asList(new Feature(EXCLAMATIVE + "_ratio", ratioExclamative)));
+        featList.addAll(Arrays.asList(new Feature(EXCLAMATIVE + "_ratio_sentence", ratioExclamativeSentence)));
+        return featList;
+    }
+}

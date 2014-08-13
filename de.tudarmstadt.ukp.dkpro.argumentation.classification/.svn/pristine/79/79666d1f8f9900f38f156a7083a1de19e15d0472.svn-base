@@ -1,0 +1,38 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation;
+
+import java.util.Arrays;
+import java.util.List;
+
+import de.tudarmstadt.ukp.dkpro.argumentation.classification.features.sentiment.SentimentCoefficientsFeature;
+import de.tudarmstadt.ukp.dkpro.lab.task.Dimension;
+/**
+ *
+ */
+public class TestFeature
+        extends AbstractEvaluationScenario
+{
+
+
+
+    @SuppressWarnings("unchecked")
+    @Override Dimension<List<String>> getFeatureSets()
+    {
+        return Dimension.create(
+                DIM_FEATURE_SET,
+                Arrays.asList(new String[] { SentimentCoefficientsFeature.class.getName(), }));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    Dimension<List<Object>> getPipelineParameters()
+    {
+
+        return Dimension.create(
+                DIM_PIPELINE_PARAMS,
+                Arrays.asList(new Object[] {
+//                        ProductionRules.PARAM_NUMBER_OF_PRODRULES, "100",
+//                        ProductionRulesTest.PARAM_PRODRULES_FD_FILE, "/home/ukp-hiwi/workspace/de.tudarmstadt.ukp.dkpro.argumentation.classification/src/main/java/de/tudarmstadt/ukp/dkpro/argumentation/classification/prodRulesFdFile/prodRules.txt"
+                }));
+    }
+
+}

@@ -1,0 +1,71 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.reader;
+
+import static org.apache.uima.fit.factory.CollectionReaderFactory.createReaderDescription;
+import static org.apache.uima.fit.util.JCasUtil.select;
+import static org.apache.uima.fit.util.JCasUtil.selectCovered;
+
+import org.apache.uima.collection.CollectionReaderDescription;
+import org.apache.uima.fit.factory.CollectionReaderFactory;
+import org.apache.uima.fit.pipeline.JCasIterable;
+import org.apache.uima.jcas.JCas;
+import org.apache.uima.resource.ResourceInitializationException;
+
+import de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity;
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
+import de.tudarmstadt.ukp.dkpro.core.api.syntax.type.constituent.ROOT;
+import de.tudarmstadt.ukp.dkpro.core.io.penntree.PennTreeUtils;
+import de.tudarmstadt.ukp.dkpro.core.io.xmi.XmiReader;
+
+public class TestReader
+{
+    public static void main(String[] args) throws ResourceInitializationException{
+
+
+        //import de.tudarmstadt.ukp.dkpro.core.io.xmi.XmiReader;
+        final CollectionReaderDescription xmiReader =
+          CollectionReaderFactory.createReaderDescription(
+              XmiReader.class,
+              XmiReader.PARAM_SOURCE_LOCATION,  "./output",
+              XmiReader.PARAM_PATTERNS, "1013_P2_artcomment_homeschooling.txt.xmi");
+
+        JCasIterable pipeline = new JCasIterable(
+                createReaderDescription(
+                        XmiReader.class,
+                        XmiReader.PARAM_SOURCE_LOCATION,  "./output",
+                        XmiReader.PARAM_PATTERNS, "1013_P2_artcomment_homeschooling.txt.xmi"));
+
+        for (JCas jcas : pipeline) {
+            for (Sentence sentence : select(jcas, Sentence.class)) {
+                System.out.printf("%n== Sentence ==%n");
+                System.out.printf("  %-16s %-10s %-10s %-10s %-10s %n", "TOKEN", "LEMMA", "STEM",
+                        "CPOS", "POS");
+                for (Token token : selectCovered(Token.class, sentence)) {
+                    System.out.printf("  %-16s %-10s %-10s %-10s %-10s %n",
+                            token.getCoveredText(),
+                            token.getLemma() != null ? token.getLemma().getValue() : "",
+                            token.getStem() != null ? token.getStem().getValue() : "",
+                            token.getPos().getClass().getSimpleName(),
+                            token.getPos().getPosValue());
+                }
+
+                System.out.printf("%n  -- Named Entities --%n");
+                System.out.printf("  %-16s %-10s%n", "ENTITY", "TOKENS");
+                for (NamedEntity ne : selectCovered(NamedEntity.class, sentence)) {
+                    System.out.printf("  %-16s %-10s%n", ne.getValue(), ne.getCoveredText());
+                }
+
+                System.out.printf("%n  -- Constituents --%n");
+                for (ROOT root : selectCovered(ROOT.class, sentence)) {
+                    System.out.printf("  %s%n",
+                            PennTreeUtils.toPennTree(PennTreeUtils.convertPennTree(root)));
+                }
+            }
+
+
+
+        }
+    }
+}
+
+

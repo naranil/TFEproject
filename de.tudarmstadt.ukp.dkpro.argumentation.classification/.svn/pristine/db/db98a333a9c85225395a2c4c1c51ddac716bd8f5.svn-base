@@ -1,0 +1,80 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification;
+
+import de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation.AbstractEvaluationScenario;
+import de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation.AbstractEvaluationScenarioTest;
+import de.tudarmstadt.ukp.dkpro.argumentation.classification.reader.CorpusReader;
+import de.tudarmstadt.ukp.dkpro.argumentation.classification.writer.AnalysisResultConsoleWriter;
+import org.apache.commons.io.IOUtils;
+import org.apache.uima.analysis_engine.AnalysisEngineDescription;
+import org.apache.uima.collection.CollectionReaderDescription;
+import org.apache.uima.fit.component.CasDumpWriter;
+import org.apache.uima.fit.factory.AnalysisEngineFactory;
+import org.apache.uima.fit.factory.CollectionReaderFactory;
+import org.apache.uima.fit.factory.JCasFactory;
+import org.apache.uima.fit.factory.TypeSystemDescriptionFactory;
+import org.apache.uima.fit.pipeline.SimplePipeline;
+import org.apache.uima.jcas.JCas;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Result;
+import org.junit.runner.notification.Failure;
+
+/**
+ *
+ */
+public class MaltParserTest
+{
+
+    private JCas jCas;
+    private AnalysisEngineDescription preprocessing;
+    private CollectionReaderDescription readerDescription;
+
+    @Before
+    public void setUp()
+            throws Exception
+    {
+        //        final String text =
+        //                "Shermanator how little do you know about home education - your comment \"The development of these social skills is something that simply can't be duplicated in a home setting.\" is totally ridiculous! Home educators do not lock their children in cupboards all day and only bring them out on special occasions! I know a lot of home educators whose children are involved in: music lessons, ballet, drama, St John Ambulance groups, Guiding and Scouting etc etc. Children who are home educated are far more articulate than their schooled peers, they have great confidence and they can socialise perfectly well with all ages whereas schooled children tend to stick to their peer group. Where in the world of business do you see an office full of 18 year olds and another full of 26 year olds - you don't! \n"
+        //                        + "People who mention socialisation as a plus for schooling really should look at the product the schools churn out! How many 'hoodies' are home educated? How many pregnant 14 years olds are home educated? How many young people who knife their peers are home educated? How many underage drinkers/binge drinkers are home educated? How many smokers are home educated? Need I go on? \n"
+        //                        + "Before using fallacious arguments people really need to look at the evidence and get their facts straight! ";
+        final String text = IOUtils.toString(this.getClass().getClassLoader()
+                //                .getResourceAsStream("gold_data/1314_P1_artcomment_homeschooling.txt"));
+                .getResourceAsStream("gold_data/1314_P2_artcomment_prayer-in-schools.txt"));
+
+        jCas = JCasFactory
+                .createJCas(TypeSystemDescriptionFactory.createTypeSystemDescription());
+
+        jCas.setDocumentText(text);
+        jCas.setDocumentLanguage("en");
+
+        preprocessing = new AbstractEvaluationScenarioTest.MockAbstractEvaluationScenario()
+                .getPreprocessing();
+
+        readerDescription = CollectionReaderFactory
+                .createReaderDescription(CorpusReader.class,
+                        CorpusReader.PARAM_SOURCE_LOCATION,
+                        AbstractEvaluationScenario.GOLD_DATA_PATH,
+                        CorpusReader.PARAM_LANGUAGE, AbstractEvaluationScenario.LANGUAGE_CODE,
+                        CorpusReader.PARAM_PATTERNS,
+                        "1314_P2_artcomment_prayer-in-schools.txt");
+    }
+
+    @Test
+    public void testPipeline()
+            throws Exception
+    {
+        SimplePipeline.runPipeline(readerDescription, preprocessing,
+                AnalysisEngineFactory.createEngineDescription(AnalysisResultConsoleWriter.class)
+        );
+    }
+
+    public static void main(String[] args)
+    {
+        Result result = JUnitCore.runClasses(CoreferenceResolutionTest.class);
+        for (Failure failure : result.getFailures()) {
+            failure.getException().printStackTrace(System.err);
+        }
+        System.out.println(result.wasSuccessful());
+    }
+}

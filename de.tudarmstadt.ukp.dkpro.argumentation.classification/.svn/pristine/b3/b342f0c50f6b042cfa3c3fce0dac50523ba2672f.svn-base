@@ -1,0 +1,52 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation;
+
+import de.tudarmstadt.ukp.dkpro.lab.logging.impl.DefaultLoggingService;
+import org.apache.uima.ResourceFactory;
+import org.apache.uima.UimaContext;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class ExperimentRunner
+{
+    static Logger logger = Logger.getLogger(ExperimentRunner.class.getName());
+
+    public static void main(String[] args)
+    {
+        // different settings
+        List<AbstractEvaluationScenario> evaluationScenarios = new ArrayList<>();
+
+        // baseline
+        evaluationScenarios.add(new BaselineNGram());
+        // extended baseline (?)
+//        evaluationScenarios.add(new ExtendedBaseline());
+
+
+        for (AbstractEvaluationScenario evaluationScenario : evaluationScenarios) {
+            logger.info("Evaluation scenario: " + evaluationScenario);
+
+            // first: full cross validation
+            evaluationScenario.runFullCrossValidation();
+
+            // in-domain for all domains
+            for (DocumentDomain documentDomain : DocumentDomain.values()) {
+                evaluationScenario.runInDomainCrossValidation(documentDomain);
+            }
+
+            // cross-domain for all domains
+            for (DocumentDomain documentDomain : DocumentDomain.values()) {
+                evaluationScenario.runCrossDomain(documentDomain);
+            }
+        }
+
+    }
+
+    public static void main1test(String[] args)
+    {
+//        new BaselineNGram().runInDomainCrossValidation(DocumentDomain.PUBLIC_PRIVATE_SCHOOLS);
+        new BaselineNGram().runCrossDomain(DocumentDomain.PUBLIC_PRIVATE_SCHOOLS);
+    }
+
+}

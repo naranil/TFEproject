@@ -1,0 +1,85 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.junit;
+
+import static org.apache.uima.fit.factory.AnalysisEngineFactory.createEngineDescription;
+import static org.apache.uima.fit.factory.CollectionReaderFactory.createReaderDescription;
+
+import org.apache.uima.fit.pipeline.JCasIterable;
+import org.apache.uima.jcas.JCas;
+import org.apache.uima.resource.ResourceInitializationException;
+import org.junit.Test;
+
+import de.tudarmstadt.ukp.dkpro.core.berkeleyparser.BerkeleyParser;
+import de.tudarmstadt.ukp.dkpro.core.io.text.TextReader;
+import de.tudarmstadt.ukp.dkpro.core.languagetool.LanguageToolSegmenter;
+import de.tudarmstadt.ukp.dkpro.core.maltparser.MaltParser;
+
+/**
+ *  JUnit test for the Berkeley Parser and the MaltParser
+ *  @author Anil Narassiguin
+ *  @input Two text files, one without multiple punctuation and one with it
+ *  (by multiple I mean "How are you ?!!? for example)"
+ *
+ */
+
+public class MultiplePunctuation
+{
+
+    @Test
+    public void testSinglePunc()
+    {
+        try {
+            JCasIterable pipeline1 = new JCasIterable(
+                    // Read input
+                    createReaderDescription(TextReader.class,
+                            TextReader.PARAM_SOURCE_LOCATION, "src/main/resources/multiple_punctuation/one_mark.txt",
+                            TextReader.PARAM_LANGUAGE, "en"),
+                    // Token, Sentence
+                    createEngineDescription(LanguageToolSegmenter.class),
+                    // Constituent, POS
+                    createEngineDescription(BerkeleyParser.class),
+                    // Dependency
+                    createEngineDescription(MaltParser.class));
+
+            for (JCas jcas : pipeline1){
+                jcas.getDocumentText();
+            }
+
+        }
+        catch (ResourceInitializationException e) {
+            e.printStackTrace();
+        }
+
+
+    }
+
+
+    @Test
+    public void testMultiplePunc()
+    {
+        try {
+            JCasIterable pipeline = new JCasIterable(
+                    // Read input
+                    createReaderDescription(TextReader.class,
+                            TextReader.PARAM_SOURCE_LOCATION, "src/main/resources/multiple_punctuation/multiple_marks.txt",
+                            TextReader.PARAM_LANGUAGE, "en"),
+                    // Token, Sentence
+                    createEngineDescription(LanguageToolSegmenter.class),
+                    // Constituent, POS
+                    createEngineDescription(BerkeleyParser.class),
+                    // Dependency
+                    createEngineDescription(MaltParser.class));
+
+            for (JCas jcas : pipeline){
+                jcas.getDocumentText();
+            }
+
+        }
+        catch (ResourceInitializationException e) {
+            e.printStackTrace();
+        }
+
+
+    }
+
+
+}

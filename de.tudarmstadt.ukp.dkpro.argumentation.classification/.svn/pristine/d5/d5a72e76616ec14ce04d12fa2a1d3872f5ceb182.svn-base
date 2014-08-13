@@ -1,0 +1,327 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation;
+
+import de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation.report.BatchReportFMeasure;
+import de.tudarmstadt.ukp.dkpro.argumentation.classification.reader.CorpusReader;
+import de.tudarmstadt.ukp.dkpro.core.berkeleyparser.BerkeleyParser;
+import de.tudarmstadt.ukp.dkpro.core.clearnlp.ClearNlpSemanticRoleLabeler;
+import de.tudarmstadt.ukp.dkpro.core.languagetool.LanguageToolSegmenter;
+import de.tudarmstadt.ukp.dkpro.core.maltparser.MaltParser;
+import de.tudarmstadt.ukp.dkpro.core.matetools.MateLemmatizer;
+import de.tudarmstadt.ukp.dkpro.core.opennlp.OpenNlpNameFinder;
+import de.tudarmstadt.ukp.dkpro.core.snowball.SnowballStemmer;
+import de.tudarmstadt.ukp.dkpro.core.stanfordnlp.StanfordCoreferenceResolver;
+import de.tudarmstadt.ukp.dkpro.lab.Lab;
+import de.tudarmstadt.ukp.dkpro.lab.task.Dimension;
+import de.tudarmstadt.ukp.dkpro.lab.task.ParameterSpace;
+import de.tudarmstadt.ukp.dkpro.lab.task.impl.BatchTask;
+import de.tudarmstadt.ukp.dkpro.tc.core.Constants;
+import de.tudarmstadt.ukp.dkpro.tc.weka.report.*;
+import de.tudarmstadt.ukp.dkpro.tc.weka.task.BatchTaskCrossValidation;
+import de.tudarmstadt.ukp.dkpro.tc.weka.task.BatchTaskTrainTest;
+import de.tudarmstadt.ukp.dkpro.tc.weka.writer.WekaDataWriter;
+import org.apache.uima.analysis_engine.AnalysisEngineDescription;
+import org.apache.uima.resource.ResourceInitializationException;
+import weka.classifiers.functions.SMO;
+
+import java.io.File;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import static org.apache.uima.fit.factory.AnalysisEngineFactory.createEngineDescription;
+
+/**
+ *
+ */
+public abstract class AbstractEvaluationScenario
+
+        implements Constants
+{
+    public static final int NUM_FOLDS = 10;
+    public static final int LEAVE_ONE_OUT_THRESHOLD = 50;
+    //    public static final String GOLD_DATA_PATH = "src/main/resources/test";
+    public static final String GOLD_DATA_PATH = "src/main/resources/gold_data";
+    public static final String LANGUAGE_CODE = "en";
+
+    /**
+     * Run a cross validation on all the data. Use
+     * to set up the reader, the
+     * classifier, the pipeline, ect... Use
+     * {@link #runCrossValidation(ParameterSpace pSpace, int numFolds)}
+     */
+    public void runFullCrossValidation()
+    {
+        ParameterSpace pSpace = getParameterSpace(null, ClassificationScenario.CROSS_VALIDATION);
+
+        try {
+            runCrossValidation(pSpace, NUM_FOLDS);
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    public void runInDomainCrossValidation(DocumentDomain documentDomain)
+    {
+        ParameterSpace pSpace = getParameterSpace(documentDomain,
+                ClassificationScenario.CROSS_VALIDATION);
+
+        // ### The Cross Validation Scenario in Domain ###
+        try {
+            int numberFiles = getNumberFiles(documentDomain.toString());
+
+            if (numberFiles < LEAVE_ONE_OUT_THRESHOLD) {
+
+                //                System.out.print("Few number of text files, run a leave-one-out CV (Y/N): ");
+                //                String answer;
+                //                Scanner scanIn = new Scanner(System.in);
+                //                answer = scanIn.nextLine();
+                //                scanIn.close();
+                //                if ("Y".equals(answer)) {
+                runCrossValidation(pSpace, numberFiles);
+                //                }
+                //                else {
+                //                    runCrossValidation(pSpace, NUM_FOLDS);
+                //                }
+            }
+            else {
+
+                runCrossValidation(pSpace, NUM_FOLDS);
+
+            }
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    public void runCrossDomain(DocumentDomain documentDomain)
+    {
+        ParameterSpace pSpace = getParameterSpace(documentDomain,
+                ClassificationScenario.CROSS_DOMAIN_TRAIN_TEST);
+
+        // ### The Cross Domain CV ###
+        try {
+            runTrainTest(pSpace);
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * TODO
+     *
+     * @param docTopic           test domain for cross domain scenario or domain for in-domain CV;
+     *                           can be null for all data
+     * @param classificationType cross validation / cross domain
+     * @return param space
+     */
+    public ParameterSpace getParameterSpace(DocumentDomain docTopic,
+            ClassificationScenario classificationType)
+    {
+        Map<String, Object> dimReaders = new HashMap<String, Object>();
+
+        String domainPattern = getDomainPattern(docTopic);
+
+        switch (classificationType) {
+        case CROSS_VALIDATION:
+            dimReaders.put(DIM_READER_TRAIN, CorpusReader.class);
+            dimReaders.put(DIM_READER_TRAIN_PARAMS, Arrays.asList(
+                    CorpusReader.PARAM_SOURCE_LOCATION, GOLD_DATA_PATH,
+                    CorpusReader.PARAM_LANGUAGE, LANGUAGE_CODE, CorpusReader.PARAM_PATTERNS,
+                    CorpusReader.INCLUDE_PREFIX + domainPattern));
+
+            break;
+        case CROSS_DOMAIN_TRAIN_TEST:
+            dimReaders.put(DIM_READER_TRAIN, CorpusReader.class);
+            // training data - all domains excluding the test one
+            dimReaders.put(DIM_READER_TRAIN_PARAMS, Arrays.asList(
+                    CorpusReader.PARAM_SOURCE_LOCATION, GOLD_DATA_PATH,
+                    CorpusReader.PARAM_LANGUAGE, LANGUAGE_CODE, CorpusReader.PARAM_PATTERNS,
+                    CorpusReader.EXCLUDE_PREFIX + domainPattern));
+            dimReaders.put(DIM_READER_TEST, CorpusReader.class);
+            // test data - the test domain
+            dimReaders.put(DIM_READER_TEST_PARAMS, Arrays.asList(
+                    CorpusReader.PARAM_SOURCE_LOCATION, GOLD_DATA_PATH,
+                    CorpusReader.PARAM_LANGUAGE, LANGUAGE_CODE, CorpusReader.PARAM_PATTERNS,
+                    CorpusReader.INCLUDE_PREFIX + domainPattern));
+        }
+
+        // Algorithms used
+        @SuppressWarnings("unchecked")
+        Dimension<List<String>> dimClassificationArgs = Dimension.create(DIM_CLASSIFICATION_ARGS,
+                Arrays.asList(SMO.class.getName()));
+        // // ZeroR
+        // Dimension<List<String>> dimClassificationArgs = Dimension.create(DIM_CLASSIFICATION_ARGS,
+        // Arrays.asList(new String[] { ZeroR.class.getName() }));
+
+        // Feature extractor
+        @SuppressWarnings("unchecked")
+        Dimension<List<Object>> dimPipelineParameters = getPipelineParameters();
+
+        // Run the features extractors
+        @SuppressWarnings({ "unchecked", "deprecation" })
+        Dimension<List<String>> dimFeatureSets = getFeatureSets();
+
+        // Set the feature mode (document, unit, pair)
+        @SuppressWarnings("unchecked")
+        Dimension<String> dimFeatureMode = Dimension.create(DIM_FEATURE_MODE, FM_DOCUMENT);
+
+        // Set the learning mode (single-multi label, regression)
+        @SuppressWarnings("unchecked")
+        Dimension<String> dimLearningMode = Dimension.create(DIM_LEARNING_MODE, LM_SINGLE_LABEL);
+
+        // Set the data writer (Weka format)
+        @SuppressWarnings("unchecked")
+        Dimension<String> dimDataWriter = Dimension.create(DIM_DATA_WRITER,
+                WekaDataWriter.class.getName());
+
+        @SuppressWarnings("unchecked")
+        ParameterSpace pSpace = new ParameterSpace(Dimension.createBundle("readers", dimReaders),
+                dimDataWriter, dimLearningMode, dimFeatureMode, dimPipelineParameters,
+                dimFeatureSets, dimClassificationArgs);
+
+        return pSpace;
+
+    }
+
+    abstract Dimension<List<String>> getFeatureSets();
+
+    abstract Dimension<List<Object>> getPipelineParameters();
+
+    /**
+     * Returns patterns for particular domains.
+     *
+     * @param documentDomain domain (can be null for all domains)
+     * @return pattern (never null)
+     */
+    public String getDomainPattern(DocumentDomain documentDomain)
+    {
+        // all documents
+        if (documentDomain == null) {
+            return "*.txt";
+        }
+
+        return "*" + documentDomain.toString() + ".txt";
+    }
+
+    // TODO refactor?
+    public static String getDomainRegex(String domain)
+    {
+
+        switch (domain) {
+        case "all":
+            return ".*.txt";
+        case "homeschooling":
+            return ".*homeschooling.txt";
+        case "prayer-in-schools":
+            return ".*prayer-in-schools.txt";
+        case "single-sex-education":
+            return ".*single-sex-education.txt";
+        case "redshirting":
+            return ".*redshirting.txt";
+        case "mainstreaming":
+            return ".*mainstreaming.txt";
+        case "public-private-schools":
+            return ".*public-private-schools.txt";
+        default:
+            return null;
+
+        }
+    }
+
+    public static int getNumberFiles(String domain)
+    {
+        int numberFile = 0;
+        File folder = new File("src/main/resources/gold_data");
+        File[] listOfFiles = folder.listFiles();
+        for (File listOfFile : listOfFiles) {
+            if (Pattern.matches(getDomainRegex(domain), listOfFile.getName())) {
+                numberFile++;
+            }
+        }
+        return numberFile;
+    }
+
+    // ##### CV #####
+    protected void runCrossValidation(ParameterSpace pSpace, int numFolds)
+            throws Exception
+    {
+
+        BatchTaskCrossValidation batch = new BatchTaskCrossValidation("Argumentation_Exp_CV",
+                getPreprocessing(), numFolds);
+        batch.addInnerReport(ClassificationReport.class);
+        batch.setParameterSpace(pSpace);
+        batch.setExecutionPolicy(BatchTask.ExecutionPolicy.RUN_AGAIN);
+        batch.addReport(BatchOutcomeIDReport.class);
+        batch.addReport(BatchCrossValidationReport.class);
+        batch.addReport(BatchReportFMeasure.class);
+
+        // Run
+        Lab.getInstance().run(batch);
+    }
+
+    // ##### TRAIN-TEST #####
+    protected void runTrainTest(ParameterSpace pSpace)
+            throws Exception
+    {
+
+        BatchTaskTrainTest batch = new BatchTaskTrainTest("Argumentation_Exp_CD",
+                getPreprocessing());
+        batch.addInnerReport(ClassificationReport.class);
+        batch.setParameterSpace(pSpace);
+        batch.setExecutionPolicy(BatchTask.ExecutionPolicy.RUN_AGAIN);
+        batch.addReport(BatchTrainTestReport.class);
+        batch.addReport(BatchOutcomeIDReport.class);
+        batch.addReport(BatchRuntimeReport.class);
+        batch.addReport(BatchReportFMeasure.class);
+
+        // Run
+        Lab.getInstance().run(batch);
+    }
+
+    protected AnalysisEngineDescription getPreprocessing()
+            throws ResourceInitializationException
+    {
+
+        //                AnalysisEngineFactory.createEngineDescription(SentenceAnnotationCorrector.class),
+        return createEngineDescription(
+                // Token, Sentence
+                createEngineDescription(LanguageToolSegmenter.class),
+                // Constituent, POS
+                createEngineDescription(BerkeleyParser.class),
+                // Dependency
+                createEngineDescription(MaltParser.class),
+                // Stem
+                createEngineDescription(SnowballStemmer.class),
+                // Lemma
+                createEngineDescription(MateLemmatizer.class),
+                // NamedEntity
+                createEngineDescription(OpenNlpNameFinder.class,
+                        OpenNlpNameFinder.PARAM_VARIANT, "person"),
+                createEngineDescription(OpenNlpNameFinder.class,
+                        OpenNlpNameFinder.PARAM_VARIANT, "organization"),
+                // CoreferenceChain, CoreferenceLink
+                createEngineDescription(StanfordCoreferenceResolver.class),
+                // SemanticPredicate, SemanticArgument
+                createEngineDescription(ClearNlpSemanticRoleLabeler.class)
+                // Write output as XMI for inspection in UIMA CAS Editor
+        );
+
+    }
+
+    /**
+     * Classification scenarios: cross validation, cross domain (train/test)
+     */
+    public static enum ClassificationScenario
+    {
+        CROSS_VALIDATION,
+        CROSS_DOMAIN_TRAIN_TEST
+    }
+
+}

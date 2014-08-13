@@ -1,0 +1,79 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation.report;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import de.tudarmstadt.ukp.dkpro.argumentation.classification.evaluation.utils.ConfusionMatrix;
+import de.tudarmstadt.ukp.dkpro.lab.reporting.BatchReportBase;
+import de.tudarmstadt.ukp.dkpro.lab.reporting.FlexTable;
+import de.tudarmstadt.ukp.dkpro.lab.storage.StorageService;
+import de.tudarmstadt.ukp.dkpro.lab.storage.impl.StringAdapter;
+import de.tudarmstadt.ukp.dkpro.lab.task.TaskContextMetadata;
+import de.tudarmstadt.ukp.dkpro.tc.core.Constants;
+import de.tudarmstadt.ukp.dkpro.tc.core.util.ReportUtils;
+import de.tudarmstadt.ukp.dkpro.tc.weka.task.BatchTaskCrossValidation;
+import de.tudarmstadt.ukp.dkpro.tc.weka.task.TestTask;
+
+/**
+ * Reports extended measures based on confusion matrix.
+ *
+ * @author habernal
+ */
+public class BatchReportFMeasure
+        extends BatchReportBase
+        implements Constants
+{
+
+    @Override
+    public void execute()
+            throws Exception
+    {
+        StorageService store = getContext().getStorageService();
+
+        Map<List<String>, Double> confMatrixMap = new HashMap<>();
+
+        for (TaskContextMetadata taskContextMetadata : getSubtasks()) {
+            String name = BatchTaskCrossValidation.class.getSimpleName();
+            // one CV batch (which internally ran numFolds times)
+            if (taskContextMetadata.getLabel().startsWith(name) || taskContextMetadata.getType()
+                    .startsWith(TestTask.class.getName())) {
+                File confMatrix = store.getStorageFolder(
+                        taskContextMetadata.getId(), CONFUSIONMATRIX_KEY);
+
+                if (confMatrix.isFile()) {
+                    confMatrixMap = ReportUtils.updateAggregateMatrix(confMatrixMap, confMatrix);
+                }
+            }
+        }
+
+        FlexTable<String> confMatrix = ReportUtils.createOverallConfusionMatrix(confMatrixMap);
+
+        ConfusionMatrix cm = new ConfusionMatrix();
+        cm.setNumberOfDecimalPlaces(4);
+
+        for (String rowId : confMatrix.getRowIds()) {
+            for (String columnId : confMatrix.getColumnIds()) {
+                String value = confMatrix.getValue(rowId, columnId);
+                Integer count = (int) Double.parseDouble(value);
+
+                String expectedLabel = rowId.replace("(act.)", "").trim();
+                String predictedLabel = columnId.replace("(pred.)", "").trim();
+
+                cm.increaseValue(expectedLabel, predictedLabel, count);
+            }
+        }
+
+        String output =
+                cm.toString() + "\n" + cm.printNiceResults() + "\n" + cm.printLabelPrecRecFm();
+        String csv =
+                cm.resultsCsv();
+        System.out.println(output);
+        System.out.println(csv);
+
+        getContext().storeBinary("result_all.txt", new StringAdapter(output));
+        getContext().storeBinary("result_all.csv", new StringAdapter(csv));
+    }
+
+}

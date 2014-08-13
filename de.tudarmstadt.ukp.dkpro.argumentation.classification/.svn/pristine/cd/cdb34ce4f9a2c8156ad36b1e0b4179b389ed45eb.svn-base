@@ -1,0 +1,198 @@
+package de.tudarmstadt.ukp.dkpro.argumentation.classification.features.sentiment;
+
+import static org.apache.uima.fit.util.JCasUtil.select;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
+
+import org.apache.commons.math.stat.descriptive.rank.Min;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.apache.commons.math3.stat.descriptive.moment.Mean;
+import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
+import org.apache.commons.math3.stat.descriptive.rank.Max;
+import org.apache.uima.jcas.JCas;
+import org.ejml.simple.SimpleMatrix;
+
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
+import de.tudarmstadt.ukp.dkpro.tc.api.exception.TextClassificationException;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.DocumentFeatureExtractor;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.Feature;
+import de.tudarmstadt.ukp.dkpro.tc.api.features.FeatureExtractorResource_ImplBase;
+import edu.stanford.nlp.ling.CoreAnnotations;
+import edu.stanford.nlp.neural.rnn.RNNCoreAnnotations;
+import edu.stanford.nlp.pipeline.Annotation;
+import edu.stanford.nlp.pipeline.StanfordCoreNLP;
+import edu.stanford.nlp.sentiment.SentimentCoreAnnotations;
+import edu.stanford.nlp.trees.Tree;
+import edu.stanford.nlp.util.CoreMap;
+
+/** This feature takes the results of the Stanford parser which given a sentence
+ * returns 5 ratios: --, -, neutral, +, ++
+ * We calculate the modes (min, max, mean, sd) over all the sentences of the text which
+ * results in 20 features.
+ *
+ * @author Anil Narassiguin
+ *
+ *
+ */
+
+// Note: This feature class is still not well written since I take the sentiment coefficients
+// directly from the Stanford parser (In the future we should have our own Sentiment annotator
+// which fits better to DKPro)
+
+public class SentimentCoefficientsFeature
+    extends FeatureExtractorResource_ImplBase
+    implements DocumentFeatureExtractor
+
+
+{
+    /**
+     * This function concatenate a double array with a double
+     * @param org     array of double
+     * @param added   double that's added to the array
+     * @return New array composed of org and added.
+     */
+    static double[] addElement(double[] org, double added) {
+        double[] result = Arrays.copyOf(org, org.length +1);
+        result[org.length] = added;
+        return result;
+    }
+    /**
+     * Extracts the sentiment features
+     *
+     * Use {@link #addElement(double[] org, double added)} to concatenate values
+     *
+     * @param jcas  of a document
+     * @return The 20 sentiment features
+     */
+    @Override
+    public List<Feature> extract(JCas jcas)
+        throws TextClassificationException{
+
+        double[] veryNegative = {};
+	    List<Double> veryNegativeList = new ArrayList<>();
+	    DescriptiveStatistics veryNegativeStatistics = new DescriptiveStatistics();
+        double[] negative = {};
+        double[] neutral = {};
+        double[] positive = {};
+        double[] veryPositive = {};
+
+        Properties props = new Properties();
+        props.setProperty("annotators", "tokenize, ssplit, pos, parse, sentiment");
+        StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+
+        for (Sentence sentenceDKpro : select(jcas, Sentence.class)){
+            String sentenceText = sentenceDKpro.getCoveredText();
+
+
+
+            Annotation annotation = pipeline.process(sentenceText);
+
+            for (CoreMap sentence : annotation.get(CoreAnnotations.SentencesAnnotation.class)) {
+                Tree tree = sentence.get(SentimentCoreAnnotations.AnnotatedTree.class);
+                SimpleMatrix sentimentCoefficients = RNNCoreAnnotations.getPredictions(tree);
+
+                veryNegative = addElement(veryNegative, sentimentCoefficients.get(0));
+	            veryNegativeList.add(sentimentCoefficients.get(0));
+	            veryNegativeStatistics.addValue(sentimentCoefficients.get(0));
+
+
+                negative = addElement(negative, sentimentCoefficients.get(1));
+                neutral = addElement(neutral, sentimentCoefficients.get(2));
+                positive = addElement(positive, sentimentCoefficients.get(3));
+                veryPositive = addElement(veryPositive, sentimentCoefficients.get(4));
+
+             }
+
+        }
+
+        List<Feature> featList = new ArrayList<Feature>();
+
+        // Very negative
+        Mean meanVN = new Mean();
+        Max maxVN = new Max();
+        Min minVN = new Min();
+        StandardDeviation sdVN = new StandardDeviation();
+
+        meanVN.setData(veryNegative);
+        maxVN.setData(veryNegative);
+        minVN.setData(veryNegative);
+        sdVN.setData(veryNegative);
+
+//        featList.add(new Feature("sentiment_very_negative_mean", meanVN.evaluate()));
+	    featList.add(new Feature("sentiment_very_negative_mean", veryNegativeStatistics.getMean()));
+//	    featList.add(new Feature("sentiment_very_negative_max", maxVN.evaluate()));
+	    featList.add(new Feature("sentiment_very_negative_max", veryNegativeStatistics.getMax()));
+	    featList.add(new Feature("sentiment_very_negative_min", minVN.evaluate()));
+        featList.add(new Feature("sentiment_very_negative_sd", sdVN.evaluate()));
+
+        // negative
+        Mean meanN = new Mean();
+        Max maxN = new Max();
+        Min minN = new Min();
+        StandardDeviation sdN = new StandardDeviation();
+
+        meanN.setData(negative);
+        maxN.setData(negative);
+        minN.setData(negative);
+        sdN.setData(negative);
+
+        featList.add(new Feature("sentiment_negative_mean", meanN.evaluate()));
+        featList.add(new Feature("sentiment_negative_max", maxN.evaluate()));
+        featList.add(new Feature("sentiment_negative_min", minN.evaluate()));
+        featList.add(new Feature("sentiment_negative_sd", sdN.evaluate()));
+
+        // neutral
+        Mean meanNeu = new Mean();
+        Max maxNeu = new Max();
+        Min minNeu = new Min();
+        StandardDeviation sdNeu = new StandardDeviation();
+
+        meanNeu.setData(neutral);
+        maxNeu.setData(neutral);
+        minNeu.setData(neutral);
+        sdNeu.setData(neutral);
+
+        featList.add(new Feature("sentiment_neutral_mean", meanNeu.evaluate()));
+        featList.add(new Feature("sentiment_neutral_max", maxNeu.evaluate()));
+        featList.add(new Feature("sentiment_neutral_min", minNeu.evaluate()));
+        featList.add(new Feature("sentiment_neutral_sd", sdNeu.evaluate()));
+
+        // positive
+        Mean meanP = new Mean();
+        Max maxP = new Max();
+        Min minP = new Min();
+        StandardDeviation sdP = new StandardDeviation();
+
+        meanP.setData(positive);
+        maxP.setData(positive);
+        minP.setData(positive);
+        sdP.setData(positive);
+
+        featList.add(new Feature("sentiment_positive_mean", meanP.evaluate()));
+        featList.add(new Feature("sentiment_positive_max", maxP.evaluate()));
+        featList.add(new Feature("sentiment_positive_min", minP.evaluate()));
+        featList.add(new Feature("sentiment_positive_sd", sdP.evaluate()));
+
+        // Very positive
+        Mean meanVP = new Mean();
+        Max maxVP = new Max();
+        Min minVP = new Min();
+        StandardDeviation sdVP = new StandardDeviation();
+
+        meanVP.setData(veryPositive);
+        maxVP.setData(veryPositive);
+        minVP.setData(veryPositive);
+        sdVP.setData(veryPositive);
+
+        featList.add(new Feature("sentiment_very_positive_mean", meanVP.evaluate()));
+        featList.add(new Feature("sentiment_very_positive_max", maxVP.evaluate()));
+        featList.add(new Feature("sentiment_very_positive_min", minVP.evaluate()));
+        featList.add(new Feature("sentiment_very_positive_sd", sdVP.evaluate()));
+
+        return featList;
+    }
+
+}
